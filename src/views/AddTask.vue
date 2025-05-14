@@ -11,9 +11,7 @@
           v-model="task.name"
           required
           class="form-control"
-          :class="{ 'error': errors.name }"
         >
-        <span class="error-message" v-if="errors.name">{{ errors.name }}</span>
       </div>
 
       <div class="form-group">
@@ -23,42 +21,63 @@
           v-model="task.description"
           required
           class="form-control"
-          :class="{ 'error': errors.description }"
         ></textarea>
-        <span class="error-message" v-if="errors.description">{{ errors.description }}</span>
       </div>
 
       <div class="form-group">
         <label for="status">Statut</label>
-        <select
-          id="status"
-          v-model="task.status"
-          required
-          class="form-control"
-          :class="{ 'error': errors.status }"
-        >
+        <select id="status" v-model="task.status" required class="form-control">
           <option value="à-venir">À venir</option>
           <option value="en-cours">En cours</option>
           <option value="terminé">Terminé</option>
         </select>
-        <span class="error-message" v-if="errors.status">{{ errors.status }}</span>
       </div>
 
       <div class="form-group">
-        <label for="assignees">Personnes assignées</label>
+        <label for="category">Catégorie</label>
+        <select id="category" v-model="task.category" required class="form-control">
+          <option v-for="category in categories" :key="category.id" :value="category.id">
+            {{ category.name }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="priority">Priorité</label>
+        <select id="priority" v-model="task.priority" required class="form-control">
+          <option v-for="priority in priorities" :key="priority.id" :value="priority.id">
+            {{ priority.name }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="dueDate">Date d'échéance</label>
+        <input
+          type="date"
+          id="dueDate"
+          v-model="task.dueDate"
+          required
+          class="form-control"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="assignees">Assignés (séparés par des virgules)</label>
         <input
           type="text"
           id="assignees"
           v-model="assigneesInput"
-          placeholder="Séparez les noms par des virgules"
+          required
           class="form-control"
-          :class="{ 'error': errors.assignees }"
+          placeholder="ex: John Doe, Jane Smith"
         >
-        <span class="error-message" v-if="errors.assignees">{{ errors.assignees }}</span>
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Ajouter la tâche</button>
+        <button type="submit" class="btn btn-primary" :disabled="isLoading">
+          {{ isLoading ? 'Ajout en cours...' : 'Ajouter la tâche' }}
+        </button>
         <router-link to="/" class="btn btn-secondary">Annuler</router-link>
       </div>
     </form>
@@ -75,53 +94,43 @@ export default {
   setup() {
     const store = useStore()
     const router = useRouter()
-    
+    const isLoading = computed(() => store.getters.isLoading)
+    const categories = computed(() => store.getters.getCategories)
+    const priorities = computed(() => store.getters.getPriorities)
+
     const task = ref({
       name: '',
       description: '',
       status: 'à-venir',
+      category: 1,
+      priority: 2,
+      dueDate: new Date().toISOString().split('T')[0],
       assignees: []
     })
 
     const assigneesInput = ref('')
-    const errors = ref({})
 
-    const validateForm = () => {
-      errors.value = {}
-      
-      if (!task.value.name.trim()) {
-        errors.value.name = 'Le nom de la tâche est requis'
-      }
-      
-      if (!task.value.description.trim()) {
-        errors.value.description = 'La description est requise'
-      }
-      
-      if (!task.value.status) {
-        errors.value.status = 'Le statut est requis'
-      }
+    const handleSubmit = async () => {
+      // Convertir la chaîne d'assignés en tableau
+      task.value.assignees = assigneesInput.value
+        .split(',')
+        .map(assignee => assignee.trim())
+        .filter(assignee => assignee)
 
-      const assignees = assigneesInput.value.split(',').map(name => name.trim()).filter(name => name)
-      if (assignees.length === 0) {
-        errors.value.assignees = 'Au moins une personne doit être assignée'
-      } else {
-        task.value.assignees = assignees
-      }
-
-      return Object.keys(errors.value).length === 0
-    }
-
-    const handleSubmit = () => {
-      if (validateForm()) {
-        store.dispatch('addTask', task.value)
+      try {
+        await store.dispatch('addTask', task.value)
         router.push('/')
+      } catch (error) {
+        console.error('Erreur lors de l\'ajout de la tâche:', error)
       }
     }
 
     return {
       task,
       assigneesInput,
-      errors,
+      isLoading,
+      categories,
+      priorities,
       handleSubmit
     }
   }
@@ -146,7 +155,7 @@ export default {
   margin-bottom: 20px;
 }
 
-label {
+.form-group label {
   display: block;
   margin-bottom: 5px;
   font-weight: bold;
@@ -160,15 +169,9 @@ label {
   font-size: 16px;
 }
 
-.form-control.error {
-  border-color: #f44336;
-}
-
-.error-message {
-  color: #f44336;
-  font-size: 0.9em;
-  margin-top: 5px;
-  display: block;
+textarea.form-control {
+  min-height: 100px;
+  resize: vertical;
 }
 
 .form-actions {
@@ -191,13 +194,13 @@ label {
   color: white;
 }
 
-.btn-secondary {
-  background: #9e9e9e;
-  color: white;
+.btn-primary:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
 }
 
-textarea.form-control {
-  min-height: 100px;
-  resize: vertical;
+.btn-secondary {
+  background: #f44336;
+  color: white;
 }
 </style> 
